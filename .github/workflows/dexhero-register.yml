@@ -37,11 +37,9 @@ jobs:
             echo "Run tools/sign-owner.mjs and commit .dexhero/owner.json to go live."
             exit 0
           fi
-          # Identify ourselves as a well-behaved bot (Googlebot-style token).
-          # The platform's edge (Cloudflare) drops the bare curl/* UA; a
-          # descriptive Mozilla-compatible UA is the conventional way for a
-          # legitimate automated client to pass. The durable fix is a WAF
-          # "skip" rule for this path on the dexhero.com zone.
+          # The platform exempts this API path from its browser-only scraper
+          # filter, so a plain client works. We still send a descriptive,
+          # self-identifying User-Agent as good practice.
           UA='Mozilla/5.0 (compatible; DexHeroLobbyRegister/1.0; +https://dexhero.com)'
           body="{\"repo_full_name\":\"${GITHUB_REPOSITORY}\",\"head_sha\":\"${GITHUB_SHA}\"}"
           echo "Registering ${GITHUB_REPOSITORY}@${GITHUB_SHA} with ${PLATFORM} …"
