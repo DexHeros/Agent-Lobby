@@ -1,0 +1,52 @@
+# DexHero — self-service lobby registration.
+#
+# Ships in DexHeros/Lobby-Default. When a user forks the repo directly on
+# GitHub and pushes (after committing a signed .dexhero/owner.json), this
+# workflow tells the DexHero platform to bind the fork to their wallet, so
+# it goes live at https://dexhero.com/lobby/<wallet>/.
+#
+# No secrets required — the request body is public and the ownership proof
+# is read by the platform from .dexhero/owner.json in the repo itself.
+#
+# Note: GitHub disables Actions on new forks by default. Open the "Actions"
+# tab once and click "I understand my workflows, go ahead and enable them".
+
+name: DexHero Lobby Register
+
+on:
+  push:
+    branches: [ main ]
+
+# Lets you point at a staging platform via a repo variable if needed;
+# defaults to production.
+env:
+  PLATFORM: ${{ vars.DEXHERO_PLATFORM || 'https://v3labs.onrender.com' }}
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+
+      - name: Register fork with DexHero
+        run: |
+          set -euo pipefail
+          if [ ! -f .dexhero/owner.json ]; then
+            echo "No .dexhero/owner.json yet — nothing to register."
+            echo "Run tools/sign-owner.mjs and commit .dexhero/owner.json to go live."
+            exit 0
+          fi
+          echo "Registering ${GITHUB_REPOSITORY}@${GITHUB_SHA} with ${PLATFORM} …"
+          http_code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' \
+            -X POST "${PLATFORM}/api/lobby/register-fork" \
+            -H 'content-type: application/json' \
+            -d "{\"repo_full_name\":\"${GITHUB_REPOSITORY}\",\"head_sha\":\"${GITHUB_SHA}\"}")
+          echo "HTTP ${http_code}"
+          cat /tmp/resp.json
+          echo
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Registration failed (HTTP ${http_code}). See response above."
+            exit 1
+          fi
+          echo "::notice::Lobby is live — visit ${PLATFORM}/lobby/$(jq -r .wallet /tmp/resp.json)/"

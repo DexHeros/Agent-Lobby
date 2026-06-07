@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "wallet": "0x0000000000000000000000000000000000000000",
+  "signature": "0x<130-hex-char EIP-191 personal_sign over the exact message printed by tools/sign-owner.mjs>"
+}
