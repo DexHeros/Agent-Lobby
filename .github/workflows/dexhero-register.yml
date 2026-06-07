@@ -17,10 +17,10 @@ on:
   push:
     branches: [ main ]
 
-# Lets you point at a staging platform via a repo variable if needed;
-# defaults to production.
+# Defaults to the production zone (dexhero.com). Override with a repo
+# variable DEXHERO_PLATFORM only for staging.
 env:
-  PLATFORM: ${{ vars.DEXHERO_PLATFORM || 'https://v3labs.onrender.com' }}
+  PLATFORM: ${{ vars.DEXHERO_PLATFORM || 'https://dexhero.com' }}
 
 jobs:
   register:
@@ -37,16 +37,32 @@ jobs:
             echo "Run tools/sign-owner.mjs and commit .dexhero/owner.json to go live."
             exit 0
           fi
+          # Identify ourselves as a well-behaved bot (Googlebot-style token).
+          # The platform's edge (Cloudflare) drops the bare curl/* UA; a
+          # descriptive Mozilla-compatible UA is the conventional way for a
+          # legitimate automated client to pass. The durable fix is a WAF
+          # "skip" rule for this path on the dexhero.com zone.
+          UA='Mozilla/5.0 (compatible; DexHeroLobbyRegister/1.0; +https://dexhero.com)'
+          body="{\"repo_full_name\":\"${GITHUB_REPOSITORY}\",\"head_sha\":\"${GITHUB_SHA}\"}"
           echo "Registering ${GITHUB_REPOSITORY}@${GITHUB_SHA} with ${PLATFORM} …"
-          http_code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' \
-            -X POST "${PLATFORM}/api/lobby/register-fork" \
-            -H 'content-type: application/json' \
-            -d "{\"repo_full_name\":\"${GITHUB_REPOSITORY}\",\"head_sha\":\"${GITHUB_SHA}\"}")
-          echo "HTTP ${http_code}"
-          cat /tmp/resp.json
-          echo
-          if [ "${http_code}" != "200" ]; then
-            echo "::error::Registration failed (HTTP ${http_code}). See response above."
+          attempt=1; max=5; code=000
+          while [ "$attempt" -le "$max" ]; do
+            code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' --max-time 30 \
+              -X POST "${PLATFORM}/api/lobby/register-fork" \
+              -A "$UA" -H 'content-type: application/json' -d "$body" || echo 000)
+            echo "attempt ${attempt}: HTTP ${code}"
+            # 200 = done. Real client errors (400/401/409/422) won't fix
+            # themselves — stop. Retry transient edge/server hiccups only.
+            case "$code" in
+              200) break ;;
+              403|408|429|5*|000) : ;;
+              4*) break ;;
+            esac
+            attempt=$((attempt + 1)); sleep $((attempt * 3))
+          done
+          cat /tmp/resp.json 2>/dev/null || true; echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Registration failed (HTTP ${code}). See response above."
             exit 1
           fi
-          echo "::notice::Lobby is live — visit ${PLATFORM}/lobby/$(jq -r .wallet /tmp/resp.json)/"
+          echo "::notice::Lobby is live — ${PLATFORM}/lobby/$(jq -r .wallet /tmp/resp.json)/"
