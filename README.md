@@ -5,7 +5,7 @@ The canonical default lobby for the DexHero platform.
 Every V3Labs wallet that connects GitHub and edits their lobby gets a
 personal fork of this repository. The platform runtime-fetches the
 fork's files from `raw.githubusercontent.com` and serves them at
-`https://v3labs.onrender.com/lobby/<wallet>/*`. Brand anchors in
+`https://dexhero.com/lobby/<wallet>/*`. Brand anchors in
 `index.html` are verified on every fetch.
 
 ## Forking
@@ -58,7 +58,7 @@ platform runtime falls back to this canonical default if they're
 missing from a served fork:
 
 ```html
-<meta name="dexhero:fork-of" content="DexHeros/Lobby-Default">
-<link rel="canonical" href="https://v3labs.onrender.com/">
+<meta name="dexhero:fork-of" content="DexHeros/Agent-Lobby">
+<link rel="canonical" href="https://dexhero.com/">
 <div data-dexhero-anchor hidden data-version="lobby-default-v0.1.0"></div>
 ```
